@@ -1,0 +1,21 @@
+name: devcore
+
+on: [push]
+
+jobs:
+  build-binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: |
+          GOOS=darwin GOARCH=amd64 go build -o build/devcore-darwin .
+          GOOS=linux GOARCH=amd64 go build -o build/devcore-linux .
+          GOOS=windows GOARCH=amd64 go build -o build/devcore-windows .
+      - uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: build

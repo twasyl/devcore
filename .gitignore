@@ -1,0 +1,3 @@
+build/
+devcore
+cmd/private.go
