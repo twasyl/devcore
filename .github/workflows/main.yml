@@ -14,7 +14,7 @@ jobs:
       - run: |
           GOOS=darwin GOARCH=amd64 go build -o build/devcore-darwin .
           GOOS=linux GOARCH=amd64 go build -o build/devcore-linux .
-          GOOS=windows GOARCH=amd64 go build -o build/devcore-windows .
+          # GOOS=windows GOARCH=amd64 go build -o build/devcore-windows .
       - uses: actions/upload-artifact@v3
         with:
           name: binaries
