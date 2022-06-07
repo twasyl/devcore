@@ -16,6 +16,12 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -o build/devcore-linux .
           # GOOS=windows GOARCH=amd64 go build -o build/devcore-windows .
       - uses: actions/upload-artifact@v3
+        if: success()
         with:
-          name: binaries
-          path: build
+          name: devcore-darwin
+          path: build/devcore-darwin
+      - uses: actions/upload-artifact@v3
+        if: success()
+        with:
+          name: devcore-linux
+          path: build/devcore-linux
