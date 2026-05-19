@@ -63,7 +63,6 @@ func buildDockerComposeContextCommand() *cobra.Command {
 	createCommand.MarkFlagRequired("file")
 	command.AddCommand(createCommand)
 
-	var verbose bool
 	listCommand := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},

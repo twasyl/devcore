@@ -16,50 +16,42 @@ func init() {
 		Use:   "project",
 		Short: "Utilities to manage GitHub projects",
 	}
-	projectCmd.AddCommand(buildProjectExistCmd())
-	projectCmd.AddCommand(buildProjectCloneCmd())
+	projectCmd.AddCommand(projectExistCmd)
+	projectCmd.AddCommand(projectCloneCmd)
 	projectCmd.AddCommand(buildProjectUpdateCmd())
 	rootCmd.AddCommand(projectCmd)
-
 }
 
-func buildProjectExistCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "exist",
-		Short: "Check if a project exist locally",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			project := filepath.Join(config.Config.ProjectsDir, args[0])
-			if _, err := os.Stat(project); err == nil {
-				fmt.Printf("Project %s exists in %s\n", args[0], config.Config.ProjectsDir)
-			} else if os.IsNotExist(err) {
-				fmt.Printf("Project %s does not exist in %s\n", args[0], config.Config.ProjectsDir)
-			} else {
-				return err
-			}
-			return nil
-		},
-	}
-	return cmd
-}
-
-func buildProjectCloneCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "clone",
-		Short: "Clone a project from GitHub",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			out, err := pkg.ExecCommandInDir(config.Config.ProjectsDir, "git", "clone", fmt.Sprintf("git@github.com:%s.git", args[0]))
-			fmt.Println(out)
+var projectExistCmd = &cobra.Command{
+	Use:   "exist",
+	Short: "Check if a project exist locally",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		project := filepath.Join(config.Config.ProjectsDir, args[0])
+		if _, err := os.Stat(project); err == nil {
+			fmt.Printf("Project %s exists in %s\n", args[0], config.Config.ProjectsDir)
+		} else if os.IsNotExist(err) {
+			fmt.Printf("Project %s does not exist in %s\n", args[0], config.Config.ProjectsDir)
+		} else {
 			return err
-		},
-	}
-	return cmd
+		}
+		return nil
+	},
+}
+
+var projectCloneCmd = &cobra.Command{
+	Use:   "clone",
+	Short: "Clone a project from GitHub",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		out, err := pkg.ExecCommandInDir(config.Config.ProjectsDir, "git", "clone", fmt.Sprintf("git@github.com:%s.git", args[0]))
+		fmt.Println(out)
+		return err
+	},
 }
 
 func buildProjectUpdateCmd() *cobra.Command {
 	var forceOnError = false
-	var verbose = false
 
 	cmd := &cobra.Command{
 		Use:   "update",

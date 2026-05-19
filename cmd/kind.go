@@ -17,15 +17,22 @@ func init() {
 
 	kindClusterCmd.AddCommand(createKindClusterCmd)
 	createKindClusterCmd.MarkFlagRequired("name")
-	createKindClusterCmd.Flags().StringVarP(&k8sDashboardVersion, "dashboard-version", "v", "v2.3.1", "The version of the Kubernetes dashboard to install")
-
+	createKindClusterCmd.Flags().StringVarP(&k8sDashboardVersion, "dashboard-version", "v", "v2.7.0", "The version of the Kubernetes dashboard to install")
+	createKindClusterCmd.Flags().StringVarP(&kindClusterConfigFile, "config", "c", "", "The config file to use to create the cluster")
+	createKindClusterCmd.Flags().BoolVar(&installNginx, "nginx", false, "Specify wether to install nginx or not")
+	createKindClusterCmd.Flags().StringVar(&k8sVersion, "k8s-version", "", "The Kubernetes version to install")
+	deleteKindClusterCmd.Flags().BoolVarP(&allFlag, "all", "a", false, "Indicates to delete all kind clusters")
 	kindClusterCmd.AddCommand(deleteKindClusterCmd)
 
 	kindCmd.AddCommand(kindTokenCmd)
 }
 
 var kindClusterName string
+var kindClusterConfigFile string
+var installNginx bool
 var k8sDashboardVersion string
+var allFlag bool
+var k8sVersion string
 
 var kindCmd = &cobra.Command{
 	Use:   "kind",
@@ -45,6 +52,13 @@ var createKindClusterCmd = &cobra.Command{
 		if err := createKindCluster(); err != nil {
 			return err
 		}
+
+		if installNginx {
+			if err := installNginxInCluster(); err != nil {
+				return err
+			}
+		}
+
 		return installK8sDashboard()
 	},
 }
@@ -53,11 +67,20 @@ var deleteKindClusterCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete a kind cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		output, err := du.ExecCommand("kind", "delete", "cluster", "--name", kindClusterName)
-		if err != nil {
-			fmt.Println(output)
+		if allFlag {
+			if clusters, err := du.ExecCommandAndGetSync("kind", "get", "clusters"); err != nil {
+				return err
+			} else if !strings.Contains(clusters, "No kind clusters found.") {
+				for _, cluster := range strings.Fields(clusters) {
+					if err = du.ExecCommandSync("kind", "delete", "cluster", "--name", cluster); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			return du.ExecCommandSync("kind", "delete", "cluster", "--name", kindClusterName)
 		}
-		return err
+		return nil
 	},
 }
 
@@ -65,13 +88,13 @@ var kindTokenCmd = &cobra.Command{
 	Use:   "token",
 	Short: "Get an authentication token to be used in the K8s dashboard",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		output, err := du.ExecCommand("kubectl", "-n", "kubernetes-dashboard", "get", "sa/admin-user", "-o", "jsonpath=\"{.secrets[0].name}\"")
+		output, err := du.ExecCommandAndGetSync("kubectl", "-n", "kubernetes-dashboard", "get", "sa/admin-user", "-o", "jsonpath=\"{.secrets[0].name}\"")
 		if err != nil {
 			fmt.Print(output)
 			return err
 		}
 		secret := strings.ReplaceAll(output, "\"", "")
-		output, err = du.ExecCommand("kubectl", "-n", "kubernetes-dashboard", "get", "secret", secret, "-o", "go-template=\"{{.data.token | base64decode}}\"")
+		output, err = du.ExecCommandAndGetSync("kubectl", "-n", "kubernetes-dashboard", "get", "secret", secret, "-o", "go-template=\"{{.data.token | base64decode}}\"")
 		if err != nil {
 			fmt.Print(output)
 			return err
@@ -85,13 +108,30 @@ var kindTokenCmd = &cobra.Command{
 }
 
 func createKindCluster() error {
-	output, err := du.ExecCommand("kind", "create", "cluster", "--name", kindClusterName)
-	fmt.Print(output)
-	return err
+	cmdArgs := []string{"create", "cluster", "--name", kindClusterName}
+	if kindClusterConfigFile != "" {
+		cmdArgs = append(cmdArgs, "--config", kindClusterConfigFile)
+	}
+
+	if k8sVersion != "" {
+		cmdArgs = append(cmdArgs, "--image", fmt.Sprintf("kindest/node:v%s", k8sVersion))
+	}
+
+	return du.ExecCommandSync("kind", cmdArgs...)
+}
+
+func installNginxInCluster() error {
+	return du.ExecCommandsSync([][]string{
+		{"kubectl", "apply", "-f", "https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml"},
+		{"kubectl", "wait", "--namespace", "ingress-nginx", "--for=condition=ready", "pod", "--selector=app.kubernetes.io/component=controller",
+			"--timeout=300s"},
+		{"sleep", "15s"},
+		{"kubectl", "delete", "-A", "ValidatingWebhookConfiguration", "ingress-nginx-admission"},
+	})
 }
 
 func installK8sDashboard() error {
-	_, err := du.ExecCommand("kubectl", "apply", "-f", fmt.Sprintf("https://raw.githubusercontent.com/kubernetes/dashboard/%s/aio/deploy/recommended.yaml", k8sDashboardVersion))
+	err := du.ExecCommandSync("kubectl", "apply", "-f", fmt.Sprintf("https://raw.githubusercontent.com/kubernetes/dashboard/%s/aio/deploy/recommended.yaml", k8sDashboardVersion))
 	if err != nil {
 		return err
 	}
@@ -120,7 +160,7 @@ subjects:
 		return err
 	}
 
-	_, err = du.ExecCommand("kubectl", "apply", "-f", configFile)
+	err = du.ExecCommandSync("kubectl", "apply", "-f", configFile)
 	os.Remove(configFile)
 
 	return err

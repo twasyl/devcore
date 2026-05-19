@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	du "io.twasyl/devcore/pkg/utils"
 )
@@ -22,15 +23,64 @@ type Tool struct {
 // version.
 var DefaultSupportedTools []Tool
 
+func act() Tool {
+	tool := Tool{
+		Name:            "act",
+		Description:     "Run your GitHub Actions locally",
+		CommandLineName: "act",
+		DefaultVersion:  "0.2.26",
+		OS: func() string {
+			return strings.Title(runtime.GOOS)
+		},
+	}
+	tool.Install = func(version string) error {
+		var archive = filepath.Join(os.TempDir(), "act.tar.gz")
+		osName := tool.OS()
+
+		err := du.DownloadFile(fmt.Sprintf("https://github.com/nektos/act/releases/download/v%s/act_%s_x86_64.tar.gz", version, osName), archive)
+		if err != nil {
+			return err
+		}
+
+		destinationDir := filepath.Join(os.TempDir(), "act")
+		err = os.Mkdir(destinationDir, 0755)
+		if err != nil {
+			return err
+		}
+
+		err = du.Expand(archive, destinationDir)
+		if err != nil {
+			return err
+		}
+
+		err = os.Rename(filepath.Join(destinationDir, "act"), fmt.Sprintf("/usr/local/bin/%s", tool.CommandLineName))
+		if err != nil {
+			return err
+		}
+
+		err = os.Remove(archive)
+		if err != nil {
+			return err
+		}
+
+		return os.RemoveAll(destinationDir)
+	}
+	return tool
+}
+
 func bat() Tool {
 	tool := Tool{
 		Name:            "bat",
 		Description:     "A cat like tool, but more powerful",
 		CommandLineName: "bat",
-		DefaultVersion:  "0.20.0",
+		DefaultVersion:  "0.26.1",
 		OS: func() string {
 			if runtime.GOOS == "darwin" {
-				return "apple-darwin"
+				var arch = "x86_64"
+				if runtime.GOARCH == "arm64" {
+					arch = "aarch64"
+				}
+				return fmt.Sprintf("%s-apple-darwin", arch)
 			} else if runtime.GOOS == "windows" {
 				return "pc-windows-gnu"
 			} else {
@@ -42,7 +92,7 @@ func bat() Tool {
 		var archive = filepath.Join(os.TempDir(), "bat.tar.gz")
 		osName := tool.OS()
 
-		err := du.DownloadFile(fmt.Sprintf("https://github.com/sharkdp/bat/releases/download/v%s/bat-v%s-x86_64-%s.tar.gz", version, version, osName), archive)
+		err := du.DownloadFile(fmt.Sprintf("https://github.com/sharkdp/bat/releases/download/v%s/bat-v%s-%s.tar.gz", version, version, osName), archive)
 		if err != nil {
 			return err
 		}
@@ -58,7 +108,7 @@ func bat() Tool {
 			return err
 		}
 
-		err = os.Rename(filepath.Join(destinationDir, fmt.Sprintf("bat-v%s-x86_64-%s", version, osName), "bat"), fmt.Sprintf("/usr/local/bin/%s", tool.CommandLineName))
+		err = os.Rename(filepath.Join(destinationDir, fmt.Sprintf("bat-v%s-%s", version, osName), "bat"), fmt.Sprintf("/usr/local/bin/%s", tool.CommandLineName))
 		if err != nil {
 			return err
 		}
@@ -129,7 +179,7 @@ func gh() Tool {
 		Name:            "gh",
 		Description:     "GitHub CLI tool for interacting with GitHub",
 		CommandLineName: "gh",
-		DefaultVersion:  "2.9.0",
+		DefaultVersion:  "2.92.0",
 		OS: func() string {
 			if runtime.GOOS == "darwin" {
 				return "macOS"
@@ -142,7 +192,7 @@ func gh() Tool {
 		var archive = filepath.Join(os.TempDir(), "gh.tar.gz")
 		osName := tool.OS()
 
-		err := du.DownloadFile(fmt.Sprintf("https://github.com/cli/cli/releases/download/v%s/gh_%s_%s_amd64.tar.gz", version, version, osName), archive)
+		err := du.DownloadFile(fmt.Sprintf("https://github.com/cli/cli/releases/download/v%s/gh_%s_%s_%s.tar.gz", version, version, osName, runtime.GOARCH), archive)
 		if err != nil {
 			return err
 		}
@@ -158,7 +208,7 @@ func gh() Tool {
 			return err
 		}
 
-		err = os.Rename(filepath.Join(destinationDir, fmt.Sprintf("gh_%s_%s_amd64", version, osName), "bin", "gh"), fmt.Sprintf("/usr/local/bin/%s", tool.CommandLineName))
+		err = os.Rename(filepath.Join(destinationDir, fmt.Sprintf("gh_%s_%s_%s", version, osName, runtime.GOARCH), "bin", "gh"), fmt.Sprintf("/usr/local/bin/%s", tool.CommandLineName))
 		if err != nil {
 			return err
 		}
@@ -271,6 +321,7 @@ func openshiftInstall() Tool {
 func init() {
 
 	DefaultSupportedTools = []Tool{
+		act(),
 		bat(),
 		{
 			Name:            "dive",
@@ -279,7 +330,7 @@ func init() {
 			DefaultVersion:  "0.10.0",
 			Install: func(version string) error {
 				var archive = filepath.Join(os.TempDir(), "dive.tar.gz")
-				err := du.DownloadFile(fmt.Sprintf("https://github.com/wagoodman/dive/releases/download/v%s/dive_%s_%s_amd64.tar.gz", version, version, runtime.GOOS), archive)
+				err := du.DownloadFile(fmt.Sprintf("https://github.com/wagoodman/dive/releases/download/v%s/dive_%s_%s_%s.tar.gz", version, version, runtime.GOOS, runtime.GOARCH), archive)
 				if err != nil {
 					return err
 				}
@@ -318,10 +369,10 @@ func init() {
 			Name:            "helm",
 			Description:     "The package manager for Kubernetes",
 			CommandLineName: "helm",
-			DefaultVersion:  "3.8.2",
+			DefaultVersion:  "4.1.1",
 			Install: func(version string) error {
 				var archive = filepath.Join(os.TempDir(), "helm.tar.gz")
-				err := du.DownloadFile(fmt.Sprintf("https://get.helm.sh/helm-v%s-%s-amd64.tar.gz", version, runtime.GOOS), archive)
+				err := du.DownloadFile(fmt.Sprintf("https://get.helm.sh/helm-v%s-%s-%s.tar.gz", version, runtime.GOOS, runtime.GOARCH), archive)
 				if err != nil {
 					return err
 				}
@@ -337,7 +388,43 @@ func init() {
 					return err
 				}
 
-				err = os.Rename(filepath.Join(destinationDir, fmt.Sprintf("%s-amd64", runtime.GOOS), "helm"), "/usr/local/bin/helm")
+				err = os.Rename(filepath.Join(destinationDir, fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), "helm"), "/usr/local/bin/helm")
+				if err != nil {
+					return err
+				}
+
+				err = os.Remove(archive)
+				if err != nil {
+					return err
+				}
+
+				return os.RemoveAll(destinationDir)
+			},
+		},
+		{
+			Name:            "helmfile",
+			Description:     "The package manager for Kubernetes",
+			CommandLineName: "helmfile",
+			DefaultVersion:  "0.145.2",
+			Install: func(version string) error {
+				var archive = filepath.Join(os.TempDir(), "helmfile.tar.gz")
+				err := du.DownloadFile(fmt.Sprintf("https://github.com/helmfile/helmfile/releases/download/v%s/helmfile_%s_%s_%s.tar.gz", version, version, runtime.GOOS, runtime.GOARCH), archive)
+				if err != nil {
+					return err
+				}
+
+				destinationDir := filepath.Join(os.TempDir(), "helmfile")
+				err = os.Mkdir(destinationDir, 0755)
+				if err != nil {
+					return err
+				}
+
+				err = du.Expand(archive, destinationDir)
+				if err != nil {
+					return err
+				}
+
+				err = os.Rename(filepath.Join(destinationDir, "helmfile"), "/usr/local/bin/helmfile")
 				if err != nil {
 					return err
 				}
@@ -354,7 +441,7 @@ func init() {
 			Name:            "jq",
 			Description:     "jq is a lightweight and flexible command-line JSON processor",
 			CommandLineName: "jq",
-			DefaultVersion:  "1.6",
+			DefaultVersion:  "1.8.1",
 			OS: func() string {
 				if runtime.GOOS == "darwin" {
 					return "macOS"
@@ -366,7 +453,7 @@ func init() {
 				var jqDownloadFilename string
 				var destinationFile string
 				if runtime.GOOS == "darwin" {
-					jqDownloadFilename = "jq-osx-amd64"
+					jqDownloadFilename = fmt.Sprintf("jq-osx-%s", runtime.GOARCH)
 					destinationFile = "/usr/local/bin/jq"
 				} else if runtime.GOOS == "linux" {
 					jqDownloadFilename = "jq-linux64"
@@ -383,9 +470,18 @@ func init() {
 			Name:            "kind",
 			Description:     "kind is a tool for running local Kubernetes clusters using Docker container \"nodes\"",
 			CommandLineName: "kind",
-			DefaultVersion:  "0.12.0",
+			DefaultVersion:  "0.31.0",
 			Install: func(version string) error {
-				return du.DownloadFile(fmt.Sprintf("https://github.com/kubernetes-sigs/kind/releases/download/v%s/kind-%s-amd64", version, runtime.GOOS), "/usr/local/bin/kind")
+				err := du.DownloadFile(fmt.Sprintf("https://github.com/kubernetes-sigs/kind/releases/download/v%s/kind-%s-%s", version, runtime.GOOS, runtime.GOARCH), fmt.Sprintf("/usr/local/bin/kind-v%s", version))
+				if err != nil {
+					return err
+				}
+				symlink := "/usr/local/bin/kind"
+				if _, err := os.Stat(symlink); !os.IsNotExist(err) {
+					os.Remove(symlink)
+				}
+
+				return os.Symlink(fmt.Sprintf("kind-v%s", version), "/usr/local/bin/kind")
 			},
 		},
 		{
@@ -394,7 +490,7 @@ func init() {
 			CommandLineName: "kubectl",
 			DefaultVersion:  "1.23.6",
 			Install: func(version string) error {
-				return du.DownloadFile(fmt.Sprintf("https://dl.k8s.io/release/v%s/bin/%s/amd64/kubectl", version, runtime.GOOS), "/usr/local/bin/kubectl")
+				return du.DownloadFile(fmt.Sprintf("https://dl.k8s.io/release/v%s/bin/%s/%s/kubectl", version, runtime.GOOS, runtime.GOARCH), "/usr/local/bin/kubectl")
 			},
 		},
 		{
@@ -404,7 +500,7 @@ func init() {
 			DefaultVersion:  "4.5.4",
 			Install: func(version string) error {
 				var archive = filepath.Join(os.TempDir(), "kustomize.tar.gz")
-				err := du.DownloadFile(fmt.Sprintf("https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v%s/kustomize_v%s_%s_amd64.tar.gz", version, version, runtime.GOOS), archive)
+				err := du.DownloadFile(fmt.Sprintf("https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v%s/kustomize_v%s_%s_%s.tar.gz", version, version, runtime.GOOS, runtime.GOARCH), archive)
 				if err != nil {
 					return err
 				}
@@ -465,12 +561,14 @@ func init() {
 				if runtime.GOOS == "darwin" {
 					mavenPathD := "/etc/paths.d/maven"
 					if _, err := os.Stat(mavenPathD); os.IsNotExist(err) {
-						if _, err := os.Create(mavenPathD); err != nil {
+						if file, err := os.Create(mavenPathD); err != nil {
 							return err
+						} else {
+							defer file.Close()
 						}
 					}
 
-					if err := os.WriteFile(mavenPathD, []byte(fmt.Sprintf("/Library/maven/%s/bin/mvn", version)), 0755); err != nil {
+					if err := os.WriteFile(mavenPathD, []byte(fmt.Sprintf("/Library/maven/%s/bin", version)), 0755); err != nil {
 						return err
 					}
 				} else if runtime.GOOS == "linux" {
@@ -534,13 +632,31 @@ func init() {
 			},
 		},
 		{
+			Name:            "rosa",
+			Description:     "Manage your ROSA cluster",
+			CommandLineName: "rosa",
+			DefaultVersion:  "1.2.24",
+			Install: func(version string) error {
+				err := du.DownloadFile(fmt.Sprintf("https://github.com/openshift/rosa/releases/download/v%s/rosa-%s-amd64", version, runtime.GOOS), fmt.Sprintf("/usr/local/bin/rosa-v%s", version))
+				if err != nil {
+					return err
+				}
+				symlink := "/usr/local/bin/rosa"
+				if _, err := os.Stat(symlink); !os.IsNotExist(err) {
+					os.Remove(symlink)
+				}
+
+				return os.Symlink(fmt.Sprintf("rosa-v%s", version), "/usr/local/bin/rosa")
+			},
+		},
+		{
 			Name:            "terraform",
 			Description:     "Terraform is an open-source infrastructure as code software tool that enables you to safely and predictably create, change, and improve infrastructure",
 			CommandLineName: "terraform",
-			DefaultVersion:  "1.1.9",
+			DefaultVersion:  "1.15.3",
 			Install: func(version string) error {
 				var archive = filepath.Join(os.TempDir(), "terraform.zip")
-				err := du.DownloadFile(fmt.Sprintf("https://releases.hashicorp.com/terraform/%s/terraform_%s_%s_amd64.zip", version, version, runtime.GOOS), archive)
+				err := du.DownloadFile(fmt.Sprintf("https://releases.hashicorp.com/terraform/%s/terraform_%s_%s_%s.zip", version, version, runtime.GOOS, runtime.GOARCH), archive)
 				if err != nil {
 					return err
 				}
@@ -573,9 +689,9 @@ func init() {
 			Name:            "yq",
 			Description:     "yq is a lightweight and portable command-line YAML, JSON and XML processor",
 			CommandLineName: "yq",
-			DefaultVersion:  "4.24.5",
+			DefaultVersion:  "4.53.2",
 			Install: func(version string) error {
-				return du.DownloadFile(fmt.Sprintf("https://github.com/mikefarah/yq/releases/download/v%s/yq_%s_amd64", version, runtime.GOOS), "/usr/local/bin/yq")
+				return du.DownloadFile(fmt.Sprintf("https://github.com/mikefarah/yq/releases/download/v%s/yq_%s_%s", version, runtime.GOOS, runtime.GOARCH), "/usr/local/bin/yq")
 			},
 		},
 	}

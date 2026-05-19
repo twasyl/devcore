@@ -25,7 +25,6 @@ func init() {
 
 var tool config.Tool
 var toolVersion string
-var verbose bool
 
 var toolsCommand = &cobra.Command{
 	Use:   "tools",

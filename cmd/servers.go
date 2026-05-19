@@ -18,6 +18,9 @@ func init() {
 
 	serversCommand.AddCommand(serversInstallCmd)
 	serversInstallCmd.PersistentFlags().StringVarP(&serverVersion, "version", "v", "", "The version of the server to install")
+
+	serversListCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose mode")
+	serversCommand.AddCommand(serversListCmd)
 }
 
 var server config.Server
@@ -51,5 +54,21 @@ var serversInstallCmd = &cobra.Command{
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		fmt.Println(fmt.Sprintf("%s installed successfully", server.Name))
+	},
+}
+
+var serversListCmd = &cobra.Command{
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "List supported servers",
+	Run: func(cmd *cobra.Command, args []string) {
+
+		fmt.Println("Supported servers:")
+		for _, server := range config.DefaultSupportedServers {
+			fmt.Printf("  - %s\n", server.Name)
+			if verbose {
+				fmt.Printf("    Default version: %s\n", server.DefaultVersion)
+			}
+		}
 	},
 }

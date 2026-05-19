@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"io.twasyl/devcore/pkg/config"
 )
@@ -17,7 +19,7 @@ func buildConfigCommand() *cobra.Command {
 	}
 
 	command.AddCommand(buildRestoreDefaultToolsVersions())
-
+	command.AddCommand(configGet)
 	return command
 }
 
@@ -41,4 +43,19 @@ func buildRestoreDefaultToolsVersions() *cobra.Command {
 	}
 
 	return command
+}
+
+var configGet = &cobra.Command{
+	Use:   "get",
+	Short: "Display the config",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 0 {
+			fmt.Printf("servers-dir: %s\n", config.Config.ServersDir)
+			fmt.Printf("projects-dir: %s\n", config.Config.ProjectsDir)
+		} else if args[0] == "servers-dir" {
+			fmt.Printf("servers-dir: %s\n", config.Config.ServersDir)
+		} else if args[0] == "projects-dir" {
+			fmt.Printf("projects-dir: %s\n", config.Config.ProjectsDir)
+		}
+	},
 }

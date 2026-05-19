@@ -46,6 +46,7 @@ type JenkinsContext struct {
 	JavaHome    string   `json:"java-home"`
 	Options     []string `json:"options"`
 	JVMOptions  []string `json:"jvm-options"`
+	Environment []string `json:"environment"`
 	Pid         int      `json:"pid"`
 }
 
@@ -165,6 +166,9 @@ func (j *Jenkins) UpdateContext(c JenkinsContext) error {
 			j.Contexts[index].JenkinsHome = c.JenkinsHome
 			j.Contexts[index].War = c.War
 			j.Contexts[index].Pid = c.Pid
+			j.Contexts[index].Options = c.Options
+			j.Contexts[index].JVMOptions = c.JVMOptions
+			j.Contexts[index].Environment = c.Environment
 			return nil
 		}
 	}

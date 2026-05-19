@@ -35,6 +35,34 @@ func ExecCommand(name string, args ...string) (string, error) {
 	return ExecCommandInDir("", name, args...)
 }
 
+func ExecCommandSync(name string, args ...string) error {
+	c := exec.Command(name, args...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return c.Run()
+}
+
+func ExecCommandsSync(commands [][]string) error {
+	for _, command := range commands {
+		if err := ExecCommandSync(command[0], command[1:]...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ExecCommandAndGetSync(name string, args ...string) (string, error) {
+	c := exec.Command(name, args...)
+
+	if out, err := c.CombinedOutput(); err != nil {
+		return "", err
+	} else {
+		return string(out), err
+	}
+}
+
 func ToClipboard(content []byte) {
 	arch := runtime.GOOS
 	var copyCmd *exec.Cmd
@@ -218,4 +246,39 @@ func IsLinux() bool {
 
 func IsOSX() bool {
 	return runtime.GOOS == "darwin"
+}
+
+func CopyToClipboard(content string) error {
+	if IsOSX() {
+		cmd := exec.Command("pbcopy")
+
+		input, err := cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+
+		err = cmd.Start()
+		if err != nil {
+			return err
+		}
+
+		if _, err = input.Write([]byte(content)); err != nil {
+			return err
+		}
+
+		if err := input.Close(); err != nil {
+			return err
+		}
+
+		return cmd.Wait()
+	}
+	return nil
+}
+
+func OpenFileExplorer(dir string) error {
+	if IsOSX() {
+		cmd := exec.Command("open", dir)
+		return cmd.Start()
+	}
+	return nil
 }

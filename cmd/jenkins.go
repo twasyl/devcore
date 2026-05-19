@@ -137,11 +137,11 @@ func buildJenkinsContextCommand() *cobra.Command {
 	createCommand.Flags().StringVar(&context.JavaHome, "java-home", "", "The Java home to use with this context. If unspecified, the default JAVA_HOME of the system will be used")
 	createCommand.Flags().StringArrayVar(&context.Options, "option", nil, "The option to pass to Jenkins at startup. Use multiple times for multiple options")
 	createCommand.Flags().StringArrayVar(&context.JVMOptions, "jvm-option", nil, "The JVM option to pass to Jenkins at startup. Use multiple times for multiple options")
+	createCommand.Flags().StringArrayVarP(&context.Environment, "environment", "e", nil, "The environment variable to set. Use multiple times for multiple variables")
 	createCommand.MarkFlagRequired("name")
 	createCommand.MarkFlagRequired("war")
 	command.AddCommand(createCommand)
 
-	var verbose bool
 	listCommand := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -232,6 +232,7 @@ func buildJenkinsContextCommand() *cobra.Command {
 	command.AddCommand(setCurrentCommand)
 
 	additionalJvmOptions := []string{}
+	ha := false
 	startCommand := &cobra.Command{
 		Use:   "start",
 		Short: "Starts a Jenkins context",
@@ -278,7 +279,12 @@ func buildJenkinsContextCommand() *cobra.Command {
 			if context.JenkinsHome != "" {
 				c.Env = append(c.Env, fmt.Sprintf("JENKINS_HOME=%s", context.JenkinsHome))
 			}
-			c.Env = append(c.Env, "JENKINS_HA=false")
+			if context.Environment != nil {
+				for _, env := range context.Environment {
+					c.Env = append(c.Env, env)
+				}
+			}
+			c.Env = append(c.Env, fmt.Sprintf("JENKINS_HA=%t", ha))
 
 			err := pkg.DisplayCommandOutput(c)
 			context.Pid = c.Process.Pid
@@ -288,6 +294,7 @@ func buildJenkinsContextCommand() *cobra.Command {
 		},
 	}
 	startCommand.Flags().StringArrayVar(&additionalJvmOptions, "jvm-option", nil, "The JVM option to pass when starting Jenkins. Use this option multiple times for many options")
+	startCommand.Flags().BoolVar(&ha, "ha", false, "Indicate if Jenkins should be started using HA")
 	command.AddCommand(startCommand)
 
 	stopCommand := &cobra.Command{
@@ -315,7 +322,14 @@ func buildJenkinsContextCommand() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println(fmt.Sprintf("Stopping context '%s'", context.Name))
-			err := syscall.Kill(context.Pid, syscall.SIGTERM)
+			process, err := os.FindProcess(context.Pid)
+
+			if err != nil {
+				return err
+			}
+
+			defer process.Release()
+			err = process.Signal(syscall.SIGKILL)
 
 			if err == nil {
 				context.Pid = -1
@@ -356,11 +370,38 @@ func buildJenkinsContextCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(bytes))
-			return nil
+			return du.CopyToClipboard(string(bytes))
 		},
 	}
 	command.AddCommand(passwordCommand)
+
+	openJenkinsHomeCommand := &cobra.Command{
+		Use:     "open-jenkins-home",
+		Aliases: []string{"ojh"},
+		Short:   "Open the Jenkins home folder",
+		Args:    cobra.MaximumNArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			contextToGetPasswordFor := ""
+			if len(args) == 1 {
+				contextToGetPasswordFor = args[0]
+			} else if config.Config.Jenkins.CurrentContext != "" {
+				contextToGetPasswordFor = config.Config.Jenkins.CurrentContext
+			} else {
+				return errors.New("No Jenkins context specified, neither a current one is set")
+			}
+
+			if c, err := config.Config.Jenkins.FindContextByName(contextToGetPasswordFor); config.IsJenkinsContextNotFound(err) {
+				return err
+			} else {
+				context = c
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return du.OpenFileExplorer(context.JenkinsHome)
+		},
+	}
+	command.AddCommand(openJenkinsHomeCommand)
 
 	return command
 }

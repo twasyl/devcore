@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var verbose bool
+
 var rootCmd = &cobra.Command{
 	Use:   "devcore",
 	Short: "devcore provides developers/development utilities",
